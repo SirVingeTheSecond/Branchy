@@ -1,0 +1,94 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Branchy.UI.App"
+             RequestedThemeVariant="Dark">
+  
+  <Application.Resources>
+
+    <!-- Surfaces -->
+    <Color x:Key="Surface0">#111214</Color>
+    <Color x:Key="Surface1">#18191C</Color>
+    <Color x:Key="Surface2">#202226</Color>
+    <Color x:Key="OutlineSubtle">#2C2E33</Color>
+
+    <!-- Text -->
+    <Color x:Key="TextPrimary">#FFFFFF</Color>
+    <Color x:Key="TextSecondary">#B6BAC1</Color>
+    <Color x:Key="TextMuted">#7C8088</Color>
+
+    <!-- Accent -->
+    <Color x:Key="Accent">#3EA6FF</Color>
+    <Color x:Key="AccentStrong">#52B4FF</Color>
+    <Color x:Key="AccentSoft">#203248</Color>
+
+    <!-- Brushes -->
+    <SolidColorBrush x:Key="Surface0Brush" Color="{StaticResource Surface0}" />
+    <SolidColorBrush x:Key="Surface1Brush" Color="{StaticResource Surface1}" />
+    <SolidColorBrush x:Key="Surface2Brush" Color="{StaticResource Surface2}" />
+    <SolidColorBrush x:Key="OutlineSubtleBrush" Color="{StaticResource OutlineSubtle}" />
+
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimary}" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondary}" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMuted}" />
+
+    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource Accent}" />
+    <SolidColorBrush x:Key="AccentStrongBrush" Color="{StaticResource AccentStrong}" />
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="{StaticResource AccentSoft}" />
+    <SolidColorBrush x:Key="TextOnAccentBrush" Color="#0B1115" />
+    
+    <CornerRadius x:Key="PanelCornerRadius">6</CornerRadius>
+  </Application.Resources>
+
+  <!-- Global styles -->
+  <Application.Styles>
+    <FluentTheme />
+
+    <!-- Buttons -->
+    <Style Selector="Button">
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="6,4" />
+      <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource TextOnAccentBrush}" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
+    <Style Selector="Button:pointerover">
+      <Setter Property="Background" Value="{StaticResource AccentStrongBrush}" />
+    </Style>
+
+    <Style Selector="Button:disabled">
+      <Setter Property="Background" Value="{StaticResource Surface2Brush}" />
+      <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+    </Style>
+
+    <!-- TextBox -->
+    <Style Selector="TextBox">
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Background" Value="{StaticResource Surface2Brush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource OutlineSubtleBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="6,4" />
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    </Style>
+
+    <!-- ListBox -->
+    <Style Selector="ListBox">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
+    <Style Selector="ListBoxItem">
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="6,4" />
+    </Style>
+
+    <Style Selector="ListBoxItem:pointerover">
+      <Setter Property="Background" Value="{StaticResource Surface2Brush}" />
+    </Style>
+
+    <Style Selector="ListBoxItem:selected">
+      <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    </Style>
+  </Application.Styles>
+</Application>
