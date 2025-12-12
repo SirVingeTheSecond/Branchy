@@ -1,5 +1,6 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="clr-namespace:Branchy.UI.Converters"
              x:Class="Branchy.UI.App"
              RequestedThemeVariant="Dark">
   
@@ -17,9 +18,9 @@
     <Color x:Key="TextMuted">#7C8088</Color>
 
     <!-- Accent -->
-    <Color x:Key="Accent">#3EA6FF</Color>
-    <Color x:Key="AccentStrong">#52B4FF</Color>
-    <Color x:Key="AccentSoft">#203248</Color>
+    <Color x:Key="Accent">#4FD08A</Color>
+    <Color x:Key="AccentStrong">#61E29B</Color>
+    <Color x:Key="AccentSoft">#1E2C24</Color>
 
     <!-- Brushes -->
     <SolidColorBrush x:Key="Surface0Brush" Color="{StaticResource Surface0}" />
@@ -37,6 +38,8 @@
     <SolidColorBrush x:Key="TextOnAccentBrush" Color="#0B1115" />
     
     <CornerRadius x:Key="PanelCornerRadius">6</CornerRadius>
+    
+    <converters:BooleanNegationConverter x:Key="BooleanNegationConverter" />
   </Application.Resources>
 
   <!-- Global styles -->

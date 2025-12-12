@@ -23,10 +23,6 @@ public sealed class MainWindowViewModel : ReactiveObject
     private string _diffText = string.Empty;
     private string _commitMessage = string.Empty;
 
-    public MainWindowViewModel()
-        : this(null!, null!)
-    {
-    }
 
     public MainWindowViewModel(
         GetRepositoryStatusUseCase getStatusUseCase,
@@ -36,16 +32,35 @@ public sealed class MainWindowViewModel : ReactiveObject
         _getStatusUseCase = getStatusUseCase;
         _gitService = gitService;
 
+        var hasRepository = this
+            .WhenAnyValue(x => x.RepositoryPath, path => !string.IsNullOrWhiteSpace(path));
+
+        var canCommit = this.WhenAnyValue(
+            x => x.RepositoryPath,
+            x => x.CommitMessage,
+            (path, message) => !string.IsNullOrWhiteSpace(path) && !string.IsNullOrWhiteSpace(message)
+        );
+
         BrowseRepositoryCommand = ReactiveCommand.CreateFromTask(BrowseRepositoryAsync);
         ReloadStatusCommand = ReactiveCommand.CreateFromTask(ReloadStatusAsync);
         CommitCommand = ReactiveCommand.CreateFromTask(CommitAsync);
+        ReloadStatusCommand = ReactiveCommand.CreateFromTask(ReloadStatusAsync, hasRepository);
+        StageChangeCommand = ReactiveCommand.CreateFromTask<FileChangeViewModel?>(StageChangeAsync, hasRepository);
+        UnstageChangeCommand = ReactiveCommand.CreateFromTask<FileChangeViewModel?>(UnstageChangeAsync, hasRepository);
+        CommitCommand = ReactiveCommand.CreateFromTask(CommitAsync, canCommit);
     }
 
     public string RepositoryPath
     {
         get => _repositoryPath;
-        set => this.RaiseAndSetIfChanged(ref _repositoryPath, value);
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _repositoryPath, value);
+            this.RaisePropertyChanged(nameof(HasRepository));
+        }
     }
+    
+    public bool HasRepository => !string.IsNullOrWhiteSpace(RepositoryPath);
 
     public string BranchDisplay
     {
@@ -61,6 +76,7 @@ public sealed class MainWindowViewModel : ReactiveObject
         set
         {
             this.RaiseAndSetIfChanged(ref _selectedChange, value);
+            this.RaisePropertyChanged(nameof(HasSelection));
 
             if (value == null)
             {
@@ -71,6 +87,8 @@ public sealed class MainWindowViewModel : ReactiveObject
             _ = LoadDiffAsync(value);
         }
     }
+    
+    public bool HasSelection => SelectedChange != null;
 
     public string DiffText
     {
@@ -87,6 +105,10 @@ public sealed class MainWindowViewModel : ReactiveObject
     public ReactiveCommand<Unit, Unit> BrowseRepositoryCommand { get; }
 
     public ReactiveCommand<Unit, Unit> ReloadStatusCommand { get; }
+
+    public ReactiveCommand<FileChangeViewModel?, Unit> StageChangeCommand { get; }
+
+    public ReactiveCommand<FileChangeViewModel?, Unit> UnstageChangeCommand { get; }
 
     public ReactiveCommand<Unit, Unit> CommitCommand { get; }
 
@@ -125,8 +147,13 @@ public sealed class MainWindowViewModel : ReactiveObject
         RepositoryPath = localPath;
         await ReloadStatusAsync();
     }
+    
+    private Task ReloadStatusAsync()
+    {
+        return ReloadStatusAsync(null, true);
+    }
 
-    private async Task ReloadStatusAsync()
+    private async Task ReloadStatusAsync(string? preservedSelectionPath, bool resetCommitMessage)
     {
         if (string.IsNullOrWhiteSpace(RepositoryPath))
         {
@@ -137,6 +164,7 @@ public sealed class MainWindowViewModel : ReactiveObject
 
         BranchDisplay = $"{status.Branch.Name} ↑{status.Branch.AheadBy} ↓{status.Branch.BehindBy}";
 
+        var selectionPath = preservedSelectionPath ?? SelectedChange?.Path;
         Changes.Clear();
         foreach (var change in status.Changes)
         {
@@ -145,6 +173,19 @@ public sealed class MainWindowViewModel : ReactiveObject
 
         DiffText = string.Empty;
         CommitMessage = string.Empty;
+        SelectedChange = selectionPath == null
+            ? null
+            : Changes.FirstOrDefault(x => x.Path == selectionPath);
+
+        if (SelectedChange == null)
+        {
+            DiffText = string.Empty;
+        }
+
+        if (resetCommitMessage)
+        {
+            CommitMessage = string.Empty;
+        }
     }
 
     private async Task CommitAsync()
@@ -160,7 +201,43 @@ public sealed class MainWindowViewModel : ReactiveObject
         }
 
         await _gitService.CommitAsync(RepositoryPath, CommitMessage);
-        await ReloadStatusAsync();
+        await ReloadStatusAsync(null, true);
+    }
+    
+    private async Task StageChangeAsync(FileChangeViewModel? change)
+    {
+        if (change == null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(RepositoryPath))
+        {
+            return;
+        }
+
+        await _gitService.StageFileAsync(RepositoryPath, change.Path);
+        change.UpdateStagedState(true);
+
+        await ReloadStatusAsync(change.Path, false);
+    }
+
+    private async Task UnstageChangeAsync(FileChangeViewModel? change)
+    {
+        if (change == null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(RepositoryPath))
+        {
+            return;
+        }
+
+        await _gitService.UnstageFileAsync(RepositoryPath, change.Path);
+        change.UpdateStagedState(false);
+
+        await ReloadStatusAsync(change.Path, false);
     }
 
     private async Task LoadDiffAsync(FileChangeViewModel change)
@@ -191,19 +268,30 @@ public sealed class MainWindowViewModel : ReactiveObject
     }
 }
 
-public sealed class FileChangeViewModel
+public sealed class FileChangeViewModel : ReactiveObject
 {
+    private bool _isStaged;
+
     public FileChangeViewModel(FileChange change)
     {
         Path = change.Path;
         Kind = change.Kind.ToString();
         IsStaged = change.IsStaged;
+        _isStaged = change.IsStaged;
     }
 
     public string Path { get; }
 
     public string Kind { get; }
 
-    public bool IsStaged { get; }
-}
+    public bool IsStaged
+    {
+        get => _isStaged;
+        private set => this.RaiseAndSetIfChanged(ref _isStaged, value);
+    }
 
+    public void UpdateStagedState(bool isStaged)
+    {
+        IsStaged = isStaged;
+    }
+}
