@@ -83,14 +83,13 @@
 
                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
                     <Button Content="Stage"
-                            Command="{Binding DataContext.StageChangeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            Command="{Binding ((vm:MainWindowViewModel)DataContext).StageChangeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                             CommandParameter="{Binding}"
                             IsVisible="{Binding IsStaged, Converter={StaticResource BooleanNegationConverter}}" />
                     <Button Content="Unstage"
-                            Command="{Binding DataContext.UnstageChangeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            Command="{Binding ((vm:MainWindowViewModel)DataContext).UnstageChangeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                             CommandParameter="{Binding}"
                             IsVisible="{Binding IsStaged}" />
-
                   </StackPanel>
                 </Grid>
               </DataTemplate>
