@@ -22,23 +22,44 @@
     <Color x:Key="AccentStrong">#61E29B</Color>
     <Color x:Key="AccentSoft">#1E2C24</Color>
 
-    <!-- Brushes -->
+    <!-- Error -->
+    <Color x:Key="Error">#E05252</Color>
+    <Color x:Key="ErrorSoft">#2C1E1E</Color>
+
+    <!-- Warning -->
+    <Color x:Key="Warning">#E0A852</Color>
+    <Color x:Key="WarningSoft">#2C261E</Color>
+
+    <!-- Brushes: Surfaces -->
     <SolidColorBrush x:Key="Surface0Brush" Color="{StaticResource Surface0}" />
     <SolidColorBrush x:Key="Surface1Brush" Color="{StaticResource Surface1}" />
     <SolidColorBrush x:Key="Surface2Brush" Color="{StaticResource Surface2}" />
     <SolidColorBrush x:Key="OutlineSubtleBrush" Color="{StaticResource OutlineSubtle}" />
 
+    <!-- Brushes: Text -->
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimary}" />
     <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondary}" />
     <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMuted}" />
 
+    <!-- Brushes: Accent -->
     <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource Accent}" />
     <SolidColorBrush x:Key="AccentStrongBrush" Color="{StaticResource AccentStrong}" />
     <SolidColorBrush x:Key="AccentSoftBrush" Color="{StaticResource AccentSoft}" />
     <SolidColorBrush x:Key="TextOnAccentBrush" Color="#0B1115" />
+
+    <!-- Brushes: Error -->
+    <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource Error}" />
+    <SolidColorBrush x:Key="ErrorSoftBrush" Color="{StaticResource ErrorSoft}" />
+
+    <!-- Brushes: Warning -->
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource Warning}" />
+    <SolidColorBrush x:Key="WarningSoftBrush" Color="{StaticResource WarningSoft}" />
     
+    <!-- Corner Radii -->
     <CornerRadius x:Key="PanelCornerRadius">6</CornerRadius>
+    <CornerRadius x:Key="ElementCornerRadius">8</CornerRadius>
     
+    <!-- Converters -->
     <converters:BooleanNegationConverter x:Key="BooleanNegationConverter" />
   </Application.Resources>
 
@@ -62,6 +83,33 @@
     <Style Selector="Button:disabled">
       <Setter Property="Background" Value="{StaticResource Surface2Brush}" />
       <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+    </Style>
+
+    <!-- Secondary Button Style -->
+    <Style Selector="Button.secondary">
+      <Setter Property="Background" Value="{StaticResource Surface2Brush}" />
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource OutlineSubtleBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
+    <Style Selector="Button.secondary:pointerover">
+      <Setter Property="Background" Value="{StaticResource OutlineSubtleBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    </Style>
+
+    <!-- Icon Button Style -->
+    <Style Selector="Button.icon">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+      <Setter Property="Padding" Value="4" />
+      <Setter Property="MinWidth" Value="24" />
+      <Setter Property="MinHeight" Value="24" />
+    </Style>
+
+    <Style Selector="Button.icon:pointerover">
+      <Setter Property="Background" Value="{StaticResource Surface2Brush}" />
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
     </Style>
 
     <!-- TextBox -->
@@ -92,6 +140,18 @@
     <Style Selector="ListBoxItem:selected">
       <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
       <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    </Style>
+
+    <!-- ProgressBar -->
+    <Style Selector="ProgressBar">
+      <Setter Property="Background" Value="{StaticResource Surface2Brush}" />
+      <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+      <Setter Property="CornerRadius" Value="2" />
+      <Setter Property="MinHeight" Value="2" />
+    </Style>
+
+    <Style Selector="ProgressBar:indeterminate">
+      <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
     </Style>
   </Application.Styles>
 </Application>

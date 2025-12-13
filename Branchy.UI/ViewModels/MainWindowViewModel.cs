@@ -1,53 +1,95 @@
-﻿using System.Collections.ObjectModel;
-using System.Linq;
+﻿using System;
 using System.Reactive;
+using System.Reactive.Disposables;
+using System.Reactive.Disposables.Fluent;
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using System.Threading.Tasks;
-using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Platform.Storage;
 using Branchy.Application.Git;
 using Branchy.Application.Repositories;
 using Branchy.Domain.Models;
+using Branchy.UI.Services;
 using ReactiveUI;
 
 namespace Branchy.UI.ViewModels;
 
-public sealed class MainWindowViewModel : ReactiveObject
+public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 {
     private readonly GetRepositoryStatusUseCase _getStatusUseCase;
     private readonly IGitService _gitService;
+    private readonly IDialogService _dialogService;
+    private readonly CompositeDisposable _disposables = new();
+    private readonly BehaviorSubject<bool> _hasRepositorySubject = new(false);
 
     private string _repositoryPath = string.Empty;
     private string _branchDisplay = string.Empty;
-    private FileChangeViewModel? _selectedChange;
-    private string _diffText = string.Empty;
-    private string _commitMessage = string.Empty;
+    private string? _errorMessage;
 
+    private readonly ObservableAsPropertyHelper<bool> _isBusy;
 
     public MainWindowViewModel(
         GetRepositoryStatusUseCase getStatusUseCase,
-        IGitService gitService
+        IGitService gitService,
+        IDialogService dialogService
     )
     {
         _getStatusUseCase = getStatusUseCase;
         _gitService = gitService;
+        _dialogService = dialogService;
 
-        var hasRepository = this
-            .WhenAnyValue(x => x.RepositoryPath, path => !string.IsNullOrWhiteSpace(path));
+        var hasRepositoryObservable = _hasRepositorySubject.AsObservable();
 
-        var canCommit = this.WhenAnyValue(
-            x => x.RepositoryPath,
-            x => x.CommitMessage,
-            (path, message) => !string.IsNullOrWhiteSpace(path) && !string.IsNullOrWhiteSpace(message)
+        Changes = new ChangesViewModel(
+            gitService,
+            () => RepositoryPath,
+            () => HasRepository,
+            hasRepositoryObservable,
+            () => ReloadAfterStageAsync(),
+            () => ReloadAfterUnstageAsync()
+        );
+
+        Diff = new DiffViewModel(
+            gitService,
+            () => RepositoryPath,
+            ex => ErrorMessage = FormatErrorMessage(ex)
+        );
+
+        Commit = new CommitViewModel(
+            gitService,
+            () => RepositoryPath,
+            hasRepositoryObservable,
+            () => ReloadAfterCommitAsync()
         );
 
         BrowseRepositoryCommand = ReactiveCommand.CreateFromTask(BrowseRepositoryAsync);
-        ReloadStatusCommand = ReactiveCommand.CreateFromTask(ReloadStatusAsync);
-        CommitCommand = ReactiveCommand.CreateFromTask(CommitAsync);
-        ReloadStatusCommand = ReactiveCommand.CreateFromTask(ReloadStatusAsync, hasRepository);
-        StageChangeCommand = ReactiveCommand.CreateFromTask<FileChangeViewModel?>(StageChangeAsync, hasRepository);
-        UnstageChangeCommand = ReactiveCommand.CreateFromTask<FileChangeViewModel?>(UnstageChangeAsync, hasRepository);
-        CommitCommand = ReactiveCommand.CreateFromTask(CommitAsync, canCommit);
+        ReloadStatusCommand = ReactiveCommand.CreateFromTask(
+            () => ReloadStatusAsync(null, true),
+            hasRepositoryObservable
+        );
+        DismissErrorCommand = ReactiveCommand.Create(() => ErrorMessage = null);
+
+        _isBusy = Observable.CombineLatest(
+                BrowseRepositoryCommand.IsExecuting,
+                ReloadStatusCommand.IsExecuting,
+                Commit.CommitCommand.IsExecuting,
+                Changes.StageCommand.IsExecuting,
+                Changes.UnstageCommand.IsExecuting,
+                (browse, reload, commit, stage, unstage) => browse || reload || commit || stage || unstage)
+            .ToProperty(this, x => x.IsBusy)
+            .DisposeWith(_disposables);
+
+        Observable.Merge(
+                BrowseRepositoryCommand.ThrownExceptions,
+                ReloadStatusCommand.ThrownExceptions,
+                Commit.CommitCommand.ThrownExceptions,
+                Changes.StageCommand.ThrownExceptions,
+                Changes.UnstageCommand.ThrownExceptions)
+            .Subscribe(ex => ErrorMessage = FormatErrorMessage(ex))
+            .DisposeWith(_disposables);
+
+        Changes.WhenAnyValue(x => x.SelectedChange)
+            .Subscribe(change => Diff.Load(change))
+            .DisposeWith(_disposables);
     }
 
     public string RepositoryPath
@@ -56,11 +98,27 @@ public sealed class MainWindowViewModel : ReactiveObject
         set
         {
             this.RaiseAndSetIfChanged(ref _repositoryPath, value);
+            var hasRepo = !string.IsNullOrWhiteSpace(value);
+            _hasRepositorySubject.OnNext(hasRepo);
             this.RaisePropertyChanged(nameof(HasRepository));
         }
     }
-    
+
     public bool HasRepository => !string.IsNullOrWhiteSpace(RepositoryPath);
+
+    public bool IsBusy => _isBusy.Value;
+
+    public string? ErrorMessage
+    {
+        get => _errorMessage;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _errorMessage, value);
+            this.RaisePropertyChanged(nameof(HasError));
+        }
+    }
+
+    public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     public string BranchDisplay
     {
@@ -68,89 +126,45 @@ public sealed class MainWindowViewModel : ReactiveObject
         private set => this.RaiseAndSetIfChanged(ref _branchDisplay, value);
     }
 
-    public ObservableCollection<FileChangeViewModel> Changes { get; } = new();
+    public ChangesViewModel Changes { get; }
 
-    public FileChangeViewModel? SelectedChange
-    {
-        get => _selectedChange;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _selectedChange, value);
-            this.RaisePropertyChanged(nameof(HasSelection));
+    public DiffViewModel Diff { get; }
 
-            if (value == null)
-            {
-                DiffText = string.Empty;
-                return;
-            }
-
-            _ = LoadDiffAsync(value);
-        }
-    }
-    
-    public bool HasSelection => SelectedChange != null;
-
-    public string DiffText
-    {
-        get => _diffText;
-        private set => this.RaiseAndSetIfChanged(ref _diffText, value);
-    }
-
-    public string CommitMessage
-    {
-        get => _commitMessage;
-        set => this.RaiseAndSetIfChanged(ref _commitMessage, value);
-    }
+    public CommitViewModel Commit { get; }
 
     public ReactiveCommand<Unit, Unit> BrowseRepositoryCommand { get; }
 
     public ReactiveCommand<Unit, Unit> ReloadStatusCommand { get; }
 
-    public ReactiveCommand<FileChangeViewModel?, Unit> StageChangeCommand { get; }
+    public ReactiveCommand<Unit, string?> DismissErrorCommand { get; }
 
-    public ReactiveCommand<FileChangeViewModel?, Unit> UnstageChangeCommand { get; }
-
-    public ReactiveCommand<Unit, Unit> CommitCommand { get; }
+    public void Dispose()
+    {
+        Changes.Dispose();
+        Diff.Dispose();
+        Commit.Dispose();
+        _hasRepositorySubject.Dispose();
+        _disposables.Dispose();
+    }
 
     private async Task BrowseRepositoryAsync()
     {
-        var window = GetCurrentWindow();
-        if (window == null)
-        {
-            return;
-        }
-
-        var topLevel = TopLevel.GetTopLevel(window);
-        if (topLevel == null)
-        {
-            return;
-        }
-
-        var options = new FolderPickerOpenOptions
-        {
-            AllowMultiple = false
-        };
-
-        var results = await topLevel.StorageProvider.OpenFolderPickerAsync(options);
-        var folder = results.FirstOrDefault();
-        if (folder == null)
-        {
-            return;
-        }
-
-        var localPath = folder.TryGetLocalPath();
+        var localPath = await _dialogService.ShowFolderPickerAsync();
         if (string.IsNullOrWhiteSpace(localPath))
         {
             return;
         }
 
+        var isRepo = await _gitService.IsRepositoryAsync(localPath);
+        if (!isRepo)
+        {
+            ErrorMessage = "The selected folder is not a Git repository.";
+            return;
+        }
+
+        ErrorMessage = null;
         RepositoryPath = localPath;
-        await ReloadStatusAsync();
-    }
-    
-    private Task ReloadStatusAsync()
-    {
-        return ReloadStatusAsync(null, true);
+        await ReloadStatusAsync(null, true);
     }
 
     private async Task ReloadStatusAsync(string? preservedSelectionPath, bool resetCommitMessage)
@@ -162,136 +176,44 @@ public sealed class MainWindowViewModel : ReactiveObject
 
         var status = await _getStatusUseCase.ExecuteAsync(RepositoryPath);
 
-        BranchDisplay = $"{status.Branch.Name} ↑{status.Branch.AheadBy} ↓{status.Branch.BehindBy}";
-
-        var selectionPath = preservedSelectionPath ?? SelectedChange?.Path;
-        Changes.Clear();
-        foreach (var change in status.Changes)
-        {
-            Changes.Add(new FileChangeViewModel(change));
-        }
-
-        DiffText = string.Empty;
-        CommitMessage = string.Empty;
-        SelectedChange = selectionPath == null
-            ? null
-            : Changes.FirstOrDefault(x => x.Path == selectionPath);
-
-        if (SelectedChange == null)
-        {
-            DiffText = string.Empty;
-        }
+        BranchDisplay = FormatBranchDisplay(status.Branch);
+        Changes.Update(status, preservedSelectionPath);
+        Diff.Clear();
 
         if (resetCommitMessage)
         {
-            CommitMessage = string.Empty;
+            Commit.Clear();
         }
     }
 
-    private async Task CommitAsync()
+    private Task ReloadAfterStageAsync()
     {
-        if (string.IsNullOrWhiteSpace(RepositoryPath))
-        {
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(CommitMessage))
-        {
-            return;
-        }
-
-        await _gitService.CommitAsync(RepositoryPath, CommitMessage);
-        await ReloadStatusAsync(null, true);
-    }
-    
-    private async Task StageChangeAsync(FileChangeViewModel? change)
-    {
-        if (change == null)
-        {
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(RepositoryPath))
-        {
-            return;
-        }
-
-        await _gitService.StageFileAsync(RepositoryPath, change.Path);
-        change.UpdateStagedState(true);
-
-        await ReloadStatusAsync(change.Path, false);
+        var selectedPath = Changes.SelectedChange?.Path;
+        return ReloadStatusAsync(selectedPath, false);
     }
 
-    private async Task UnstageChangeAsync(FileChangeViewModel? change)
+    private Task ReloadAfterUnstageAsync()
     {
-        if (change == null)
+        var selectedPath = Changes.SelectedChange?.Path;
+        return ReloadStatusAsync(selectedPath, false);
+    }
+
+    private Task ReloadAfterCommitAsync()
+    {
+        return ReloadStatusAsync(null, true);
+    }
+
+    private static string FormatBranchDisplay(BranchStatus branch)
+    {
+        return $"{branch.Name} ↑{branch.AheadBy} ↓{branch.BehindBy}";
+    }
+
+    private static string FormatErrorMessage(Exception ex)
+    {
+        return ex switch
         {
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(RepositoryPath))
-        {
-            return;
-        }
-
-        await _gitService.UnstageFileAsync(RepositoryPath, change.Path);
-        change.UpdateStagedState(false);
-
-        await ReloadStatusAsync(change.Path, false);
-    }
-
-    private async Task LoadDiffAsync(FileChangeViewModel change)
-    {
-        if (string.IsNullOrWhiteSpace(RepositoryPath))
-        {
-            return;
-        }
-
-        var diff = await _gitService.GetDiffAsync(
-            RepositoryPath,
-            change.Path,
-            change.IsStaged
-        );
-
-        DiffText = diff;
-    }
-
-    private static Window? GetCurrentWindow()
-    {
-        if (Avalonia.Application.Current?.ApplicationLifetime
-            is IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            return desktop.MainWindow;
-        }
-
-        return null;
-    }
-}
-
-public sealed class FileChangeViewModel : ReactiveObject
-{
-    private bool _isStaged;
-
-    public FileChangeViewModel(FileChange change)
-    {
-        Path = change.Path;
-        Kind = change.Kind.ToString();
-        IsStaged = change.IsStaged;
-        _isStaged = change.IsStaged;
-    }
-
-    public string Path { get; }
-
-    public string Kind { get; }
-
-    public bool IsStaged
-    {
-        get => _isStaged;
-        private set => this.RaiseAndSetIfChanged(ref _isStaged, value);
-    }
-
-    public void UpdateStagedState(bool isStaged)
-    {
-        IsStaged = isStaged;
+            InvalidOperationException ioe when ioe.Message.Contains("Git") => ioe.Message,
+            _ => $"An error occurred: {ex.Message}"
+        };
     }
 }
