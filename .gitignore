@@ -1,5 +1,23 @@
+# Build outputs
 bin/
 obj/
-/packages/
-riderModule.iml
-/_ReSharper.Caches/
+packages/
+*.nupkg
+*.snupkg
+
+# IDE
+.idea/
+*.iml
+_ReSharper.Caches/
+*.user
+*.suo
+
+# Logs and temp
+*.log
+*.tmp
+*.temp
+*.bak
+
+# OS
+.DS_Store
+Thumbs.db
