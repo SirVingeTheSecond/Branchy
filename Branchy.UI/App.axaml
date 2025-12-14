@@ -61,6 +61,7 @@
     
     <!-- Converters -->
     <converters:BooleanNegationConverter x:Key="BooleanNegationConverter" />
+    <converters:BooleanToMaxHeightConverter x:Key="BooleanToMaxHeightConverter" />
   </Application.Resources>
 
   <!-- Global styles -->
@@ -152,6 +153,12 @@
 
     <Style Selector="ProgressBar:indeterminate">
       <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+    </Style>
+
+    <Style Selector="ProgressBar.error-progress">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{StaticResource ErrorBrush}" />
+      <Setter Property="CornerRadius" Value="0" />
     </Style>
   </Application.Styles>
 </Application>

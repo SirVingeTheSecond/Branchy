@@ -7,13 +7,13 @@ using Xunit;
 
 namespace Branchy.Test;
 
-public sealed class DiffViewModelTests : IDisposable
+public sealed class DiffViewModelTest : IDisposable
 {
     private readonly IGitService _gitService;
     private readonly DiffViewModel _viewModel;
     private Exception? _reportedError;
 
-    public DiffViewModelTests()
+    public DiffViewModelTest()
     {
         _gitService = Substitute.For<IGitService>();
 
@@ -30,10 +30,10 @@ public sealed class DiffViewModelTests : IDisposable
     }
 
     [Fact]
-    public void InitialState_ShowsEmptyDiff()
+    public void InitialState_ShowsEmptySelection()
     {
-        Assert.True(_viewModel.ShowEmptyDiff);
-        Assert.False(_viewModel.ShowDiff);
+        Assert.True(_viewModel.ShowEmptySelection);
+        Assert.False(_viewModel.ShowContent);
         Assert.Equal(string.Empty, _viewModel.DiffText);
     }
 
@@ -51,8 +51,8 @@ public sealed class DiffViewModelTests : IDisposable
         await Task.Delay(50);
 
         Assert.Equal("diff content", _viewModel.DiffText);
-        Assert.True(_viewModel.ShowDiff);
-        Assert.False(_viewModel.ShowEmptyDiff);
+        Assert.True(_viewModel.ShowContent);
+        Assert.False(_viewModel.ShowEmptySelection);
     }
 
     [Fact]
@@ -77,8 +77,8 @@ public sealed class DiffViewModelTests : IDisposable
         _viewModel.Load(null);
 
         Assert.Equal(string.Empty, _viewModel.DiffText);
-        Assert.True(_viewModel.ShowEmptyDiff);
-        Assert.False(_viewModel.ShowDiff);
+        Assert.True(_viewModel.ShowEmptySelection);
+        Assert.False(_viewModel.ShowContent);
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public sealed class DiffViewModelTests : IDisposable
         _viewModel.Clear();
 
         Assert.Equal(string.Empty, _viewModel.DiffText);
-        Assert.True(_viewModel.ShowEmptyDiff);
+        Assert.True(_viewModel.ShowEmptySelection);
     }
 
     [Fact]
@@ -135,5 +135,37 @@ public sealed class DiffViewModelTests : IDisposable
         await Task.Delay(100);
 
         Assert.Equal("diff2", _viewModel.DiffText);
+    }
+
+    [Fact]
+    public async Task Load_ThenClear_NoErrorReported()
+    {
+        var change = new FileChangeViewModel(new FileChange("file.txt", FileChangeKind.Modified, false));
+
+        _gitService
+            .GetDiffAsync("/repo", "file.txt", false, Arg.Any<CancellationToken>())
+            .Returns(async callInfo =>
+            {
+                await Task.Delay(100, callInfo.Arg<CancellationToken>());
+                return "diff";
+            });
+
+        _viewModel.Load(change);
+        _viewModel.Clear();
+
+        await Task.Delay(150);
+
+        Assert.Null(_reportedError);
+        Assert.Equal(string.Empty, _viewModel.DiffText);
+    }
+
+    [Fact]
+    public void Clear_CalledMultipleTimes_NoException()
+    {
+        _viewModel.Clear();
+        _viewModel.Clear();
+        _viewModel.Clear();
+
+        Assert.Null(_reportedError);
     }
 }

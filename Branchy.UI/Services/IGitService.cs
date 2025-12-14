@@ -1,5 +1,4 @@
-﻿
-
+﻿using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Branchy.UI.Models;
@@ -15,6 +14,17 @@ public interface IGitService
 
     Task<RepositoryStatus> GetStatusAsync(
         string repositoryPath,
+        CancellationToken cancellationToken = default
+    );
+
+    Task<IReadOnlyList<Branch>> GetBranchesAsync(
+        string repositoryPath,
+        CancellationToken cancellationToken = default
+    );
+
+    Task CheckoutAsync(
+        string repositoryPath,
+        string branchName,
         CancellationToken cancellationToken = default
     );
 

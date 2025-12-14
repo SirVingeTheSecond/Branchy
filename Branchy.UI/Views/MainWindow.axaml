@@ -16,23 +16,44 @@
     <!-- Error Banner -->
     <Border Grid.Row="0"
             Background="{StaticResource ErrorSoftBrush}"
-            BorderBrush="{StaticResource ErrorBrush}"
-            BorderThickness="0,0,0,1"
-            Padding="12,8"
-            IsVisible="{Binding HasError}">
-      <Grid ColumnDefinitions="*,Auto">
-        <TextBlock Text="{Binding ErrorMessage}"
-                   Foreground="{StaticResource ErrorBrush}"
-                   VerticalAlignment="Center"
-                   TextWrapping="Wrap" />
-        <Button Grid.Column="1"
-                Classes="icon"
-                Command="{Binding DismissErrorCommand}"
-                ToolTip.Tip="Dismiss">
-          <TextBlock Text="✕"
-                     FontSize="14"
-                     Foreground="{StaticResource ErrorBrush}" />
-        </Button>
+            ClipToBounds="True"
+            MaxHeight="{Binding HasError, Converter={StaticResource BooleanToMaxHeightConverter}}">
+      <Border.Transitions>
+        <Transitions>
+          <DoubleTransition Property="MaxHeight" Duration="0:0:0.2" Easing="CubicEaseOut" />
+        </Transitions>
+      </Border.Transitions>
+      <Grid RowDefinitions="Auto,2">
+        <Grid Margin="12,8" ColumnDefinitions="*,Auto">
+          <TextBlock Text="{Binding ErrorMessage}"
+                     Foreground="{StaticResource ErrorBrush}"
+                     VerticalAlignment="Center"
+                     TextWrapping="Wrap" />
+          <Button Grid.Column="1"
+                  Classes="icon"
+                  Command="{Binding DismissErrorCommand}"
+                  ToolTip.Tip="Dismiss">
+            <TextBlock Text="✕"
+                       FontSize="14"
+                       Foreground="{StaticResource ErrorBrush}" />
+          </Button>
+        </Grid>
+        
+        <!-- Dismiss Progress Bar -->
+        <ProgressBar Grid.Row="1"
+                     Minimum="0"
+                     Maximum="100"
+                     Value="{Binding ErrorDismissProgress}"
+                     Foreground="{StaticResource ErrorBrush}"
+                     Background="Transparent"
+                     MinHeight="2"
+                     Classes="error-progress">
+          <ProgressBar.Transitions>
+            <Transitions>
+              <DoubleTransition Property="Value" Duration="0:0:0.1" />
+            </Transitions>
+          </ProgressBar.Transitions>
+        </ProgressBar>
       </Grid>
     </Border>
 
@@ -83,91 +104,179 @@
           ColumnDefinitions="260,*"
           ColumnSpacing="10">
 
-      <!-- Left Panel: Changes -->
-      <Border x:Name="ChangesPanel"
-              Background="{StaticResource Surface1Brush}"
-              CornerRadius="{StaticResource PanelCornerRadius}"
-              BorderBrush="{StaticResource OutlineSubtleBrush}"
-              BorderThickness="1"
-              Padding="8"
-              DataContext="{Binding Changes}">
-        <Grid RowDefinitions="Auto,*" x:DataType="vm:ChangesViewModel">
-          <TextBlock Text="Changes"
-                     FontWeight="SemiBold"
-                     Margin="0,0,0,8"
-                     Foreground="{StaticResource TextPrimaryBrush}" />
+      <!-- Left Panel: Branches and Changes -->
+      <Grid RowDefinitions="Auto,*" RowSpacing="10">
 
-          <!-- Changes List -->
-          <ListBox Grid.Row="1"
-                   ItemsSource="{Binding Changes}"
-                   SelectedItem="{Binding SelectedChange, Mode=TwoWay}"
-                   IsVisible="{Binding ShowList}">
-            <ListBox.ItemTemplate>
-              <DataTemplate x:DataType="vm:FileChangeViewModel">
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                  <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Border Background="{StaticResource Surface2Brush}"
-                            CornerRadius="6"
-                            Padding="8,4">
-                      <TextBlock Text="{Binding Kind}"
-                                 Foreground="{StaticResource TextSecondaryBrush}" />
-                    </Border>
-                    <StackPanel Spacing="4">
-                      <TextBlock Text="{Binding Path}"
+        <!-- Branches Panel -->
+        <Border x:Name="BranchesPanel"
+                Background="{StaticResource Surface1Brush}"
+                CornerRadius="{StaticResource PanelCornerRadius}"
+                BorderBrush="{StaticResource OutlineSubtleBrush}"
+                BorderThickness="1"
+                Padding="8"
+                MaxHeight="200"
+                DataContext="{Binding Branches}">
+          <Grid RowDefinitions="Auto,*" x:DataType="vm:BranchesViewModel">
+            <TextBlock Text="Branches"
+                       FontWeight="SemiBold"
+                       Margin="0,0,0,8"
+                       Foreground="{StaticResource TextPrimaryBrush}" />
+
+            <!-- Branches List -->
+            <ListBox Grid.Row="1"
+                     ItemsSource="{Binding Branches}"
+                     SelectedItem="{Binding SelectedBranch, Mode=TwoWay}"
+                     IsVisible="{Binding ShowContent}">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:BranchViewModel">
+                  <Grid ColumnDefinitions="*,70">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Text="{Binding DisplayName}"
                                  Foreground="{StaticResource TextPrimaryBrush}" />
-                      <TextBlock Text="Staged"
+                      <TextBlock Text="●"
                                  Foreground="{StaticResource AccentBrush}"
+                                 FontSize="8"
+                                 VerticalAlignment="Center"
+                                 IsVisible="{Binding IsCurrent}" />
+                      <TextBlock Text="remote"
+                                 Foreground="{StaticResource TextMutedBrush}"
                                  FontSize="11"
-                                 IsVisible="{Binding IsStaged}" />
+                                 IsVisible="{Binding IsRemote}" />
                     </StackPanel>
-                  </StackPanel>
 
-                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                    <Button Content="Stage"
-                            Command="{Binding #ChangesPanel.((vm:ChangesViewModel)DataContext).StageCommand}"
+                    <Button Grid.Column="1"
+                            Content="Checkout"
+                            HorizontalAlignment="Right"
+                            Command="{Binding #BranchesPanel.((vm:BranchesViewModel)DataContext).CheckoutCommand}"
                             CommandParameter="{Binding}"
-                            IsVisible="{Binding IsStaged, Converter={StaticResource BooleanNegationConverter}}" />
-                    <Button Content="Unstage"
-                            Command="{Binding #ChangesPanel.((vm:ChangesViewModel)DataContext).UnstageCommand}"
-                            CommandParameter="{Binding}"
-                            IsVisible="{Binding IsStaged}" />
-                  </StackPanel>
-                </Grid>
-              </DataTemplate>
-            </ListBox.ItemTemplate>
-          </ListBox>
+                            IsVisible="{Binding IsCurrent, Converter={StaticResource BooleanNegationConverter}}" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
 
-          <!-- Empty State: No Repository -->
-          <StackPanel Grid.Row="1"
-                      Spacing="8"
-                      HorizontalAlignment="Center"
-                      VerticalAlignment="Center"
-                      IsVisible="{Binding ShowEmptyRepository}">
-            <TextBlock Text="No repository selected"
-                       Foreground="{StaticResource TextSecondaryBrush}"
-                       HorizontalAlignment="Center" />
-            <TextBlock Text="Click Browse to open a Git repository"
-                       Foreground="{StaticResource TextMutedBrush}"
-                       FontSize="11"
-                       HorizontalAlignment="Center" />
-          </StackPanel>
+            <!-- Empty State: No Repository -->
+            <StackPanel Grid.Row="1"
+                        Spacing="8"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        IsVisible="{Binding ShowEmptyRepository}">
+              <TextBlock Text="No repository"
+                         Foreground="{StaticResource TextSecondaryBrush}"
+                         HorizontalAlignment="Center" />
+              <TextBlock Text="Select a repository to view branches"
+                         Foreground="{StaticResource TextMutedBrush}"
+                         FontSize="11"
+                         HorizontalAlignment="Center" />
+            </StackPanel>
 
-          <!-- Empty State: No Changes -->
-          <StackPanel Grid.Row="1"
-                      Spacing="8"
-                      HorizontalAlignment="Center"
-                      VerticalAlignment="Center"
-                      IsVisible="{Binding ShowEmptyChanges}">
-            <TextBlock Text="No changes"
-                       Foreground="{StaticResource TextSecondaryBrush}"
-                       HorizontalAlignment="Center" />
-            <TextBlock Text="Your working directory is clean"
-                       Foreground="{StaticResource TextMutedBrush}"
-                       FontSize="11"
-                       HorizontalAlignment="Center" />
-          </StackPanel>
-        </Grid>
-      </Border>
+            <!-- Empty State: No Branches -->
+            <StackPanel Grid.Row="1"
+                        Spacing="8"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        IsVisible="{Binding ShowEmptyBranches}">
+              <TextBlock Text="No branches"
+                         Foreground="{StaticResource TextSecondaryBrush}"
+                         HorizontalAlignment="Center" />
+              <TextBlock Text="This repository has no branches yet"
+                         Foreground="{StaticResource TextMutedBrush}"
+                         FontSize="11"
+                         HorizontalAlignment="Center" />
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <!-- Changes Panel -->
+        <Border x:Name="ChangesPanel"
+                Grid.Row="1"
+                Background="{StaticResource Surface1Brush}"
+                CornerRadius="{StaticResource PanelCornerRadius}"
+                BorderBrush="{StaticResource OutlineSubtleBrush}"
+                BorderThickness="1"
+                Padding="8"
+                DataContext="{Binding Changes}">
+          <Grid RowDefinitions="Auto,*" x:DataType="vm:ChangesViewModel">
+            <TextBlock Text="Changes"
+                       FontWeight="SemiBold"
+                       Margin="0,0,0,8"
+                       Foreground="{StaticResource TextPrimaryBrush}" />
+
+            <!-- Changes List -->
+            <ListBox Grid.Row="1"
+                     ItemsSource="{Binding Changes}"
+                     SelectedItem="{Binding SelectedChange, Mode=TwoWay}"
+                     IsVisible="{Binding ShowContent}">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:FileChangeViewModel">
+                  <Grid ColumnDefinitions="*,70">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Border Background="{StaticResource Surface2Brush}"
+                              CornerRadius="6"
+                              Padding="8,4">
+                        <TextBlock Text="{Binding Kind}"
+                                   Foreground="{StaticResource TextSecondaryBrush}" />
+                      </Border>
+                      <StackPanel Spacing="4">
+                        <TextBlock Text="{Binding Path}"
+                                   Foreground="{StaticResource TextPrimaryBrush}" />
+                        <TextBlock Text="Staged"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   FontSize="11"
+                                   IsVisible="{Binding IsStaged}" />
+                      </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                Spacing="6"
+                                HorizontalAlignment="Right">
+                      <Button Content="Stage"
+                              Command="{Binding #ChangesPanel.((vm:ChangesViewModel)DataContext).StageCommand}"
+                              CommandParameter="{Binding}"
+                              IsVisible="{Binding IsStaged, Converter={StaticResource BooleanNegationConverter}}" />
+                      <Button Content="Unstage"
+                              Command="{Binding #ChangesPanel.((vm:ChangesViewModel)DataContext).UnstageCommand}"
+                              CommandParameter="{Binding}"
+                              IsVisible="{Binding IsStaged}" />
+                    </StackPanel>
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+
+            <!-- Empty State: No Repository -->
+            <StackPanel Grid.Row="1"
+                        Spacing="8"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        IsVisible="{Binding ShowEmptyRepository}">
+              <TextBlock Text="No repository selected"
+                         Foreground="{StaticResource TextSecondaryBrush}"
+                         HorizontalAlignment="Center" />
+              <TextBlock Text="Click Browse to open a Git repository"
+                         Foreground="{StaticResource TextMutedBrush}"
+                         FontSize="11"
+                         HorizontalAlignment="Center" />
+            </StackPanel>
+
+            <!-- Empty State: No Changes -->
+            <StackPanel Grid.Row="1"
+                        Spacing="8"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        IsVisible="{Binding ShowEmptyChanges}">
+              <TextBlock Text="No changes"
+                         Foreground="{StaticResource TextSecondaryBrush}"
+                         HorizontalAlignment="Center" />
+              <TextBlock Text="Your working directory is clean"
+                         Foreground="{StaticResource TextMutedBrush}"
+                         FontSize="11"
+                         HorizontalAlignment="Center" />
+            </StackPanel>
+          </Grid>
+        </Border>
+      </Grid>
 
       <!-- Right Panel: Diff and Commit -->
       <Grid Grid.Column="1" RowDefinitions="*,Auto" RowSpacing="10">
@@ -180,7 +289,7 @@
                 Padding="8"
                 DataContext="{Binding Diff}">
           <Grid x:DataType="vm:DiffViewModel">
-            <ScrollViewer IsVisible="{Binding ShowDiff}">
+            <ScrollViewer IsVisible="{Binding ShowContent}">
               <TextBlock Text="{Binding DiffText}"
                          FontFamily="JetBrains Mono,Consolas,Menlo,Monaco"
                          FontSize="12"
@@ -189,10 +298,10 @@
             </ScrollViewer>
 
             <!-- Empty State: No Selection -->
-            <StackPanel Spacing="4"
+            <StackPanel Spacing="8"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
-                        IsVisible="{Binding ShowEmptyDiff}">
+                        IsVisible="{Binding ShowEmptySelection}">
               <TextBlock Text="Select a change to view its diff"
                          Foreground="{StaticResource TextSecondaryBrush}"
                          HorizontalAlignment="Center" />

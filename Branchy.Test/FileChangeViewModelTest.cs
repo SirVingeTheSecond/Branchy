@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Branchy.Test;
 
-public sealed class FileChangeViewModelTests
+public sealed class FileChangeViewModelTest
 {
     [Fact]
     public void Constructor_MapsProperties()

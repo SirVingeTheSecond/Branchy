@@ -11,7 +11,7 @@ public sealed class CommitViewModel : ReactiveObject, IDisposable
 {
     private readonly Func<string> _getRepositoryPath;
     private readonly IGitService _gitService;
-    private readonly Func<Task> _onCommitCompleted;
+    private readonly Func<Task> _onOperationCompleted;
 
     private string _commitMessage = string.Empty;
 
@@ -19,12 +19,12 @@ public sealed class CommitViewModel : ReactiveObject, IDisposable
         IGitService gitService,
         Func<string> getRepositoryPath,
         IObservable<bool> hasRepositoryChanged,
-        Func<Task> onCommitCompleted
+        Func<Task> onOperationCompleted
     )
     {
         _gitService = gitService;
         _getRepositoryPath = getRepositoryPath;
-        _onCommitCompleted = onCommitCompleted;
+        _onOperationCompleted = onOperationCompleted;
 
         var canCommit = hasRepositoryChanged
             .CombineLatest(
@@ -61,6 +61,6 @@ public sealed class CommitViewModel : ReactiveObject, IDisposable
         }
 
         await _gitService.CommitAsync(repoPath, CommitMessage);
-        await _onCommitCompleted();
+        await _onOperationCompleted();
     }
 }

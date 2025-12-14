@@ -8,16 +8,15 @@ using Xunit;
 
 namespace Branchy.Test;
 
-public sealed class ChangesViewModelTests : IDisposable
+public sealed class ChangesViewModelTest : IDisposable
 {
     private readonly IGitService _gitService;
     private readonly BehaviorSubject<bool> _hasRepository;
     private readonly ChangesViewModel _viewModel;
 
-    private bool _stageCompleted;
-    private bool _unstageCompleted;
+    private bool _operationCompleted;
 
-    public ChangesViewModelTests()
+    public ChangesViewModelTest()
     {
         _gitService = Substitute.For<IGitService>();
         _hasRepository = new BehaviorSubject<bool>(false);
@@ -27,8 +26,7 @@ public sealed class ChangesViewModelTests : IDisposable
             () => "/repo",
             () => _hasRepository.Value,
             _hasRepository,
-            () => { _stageCompleted = true; return Task.CompletedTask; },
-            () => { _unstageCompleted = true; return Task.CompletedTask; }
+            () => { _operationCompleted = true; return Task.CompletedTask; }
         );
     }
 
@@ -42,7 +40,7 @@ public sealed class ChangesViewModelTests : IDisposable
     public void InitialState_ShowsEmptyRepository()
     {
         Assert.True(_viewModel.ShowEmptyRepository);
-        Assert.False(_viewModel.ShowList);
+        Assert.False(_viewModel.ShowContent);
         Assert.False(_viewModel.ShowEmptyChanges);
     }
 
@@ -52,12 +50,12 @@ public sealed class ChangesViewModelTests : IDisposable
         _hasRepository.OnNext(true);
 
         Assert.False(_viewModel.ShowEmptyRepository);
-        Assert.False(_viewModel.ShowList);
+        Assert.False(_viewModel.ShowContent);
         Assert.True(_viewModel.ShowEmptyChanges);
     }
 
     [Fact]
-    public void HasRepository_WithChanges_ShowsList()
+    public void HasRepository_WithChanges_ShowsContent()
     {
         _hasRepository.OnNext(true);
 
@@ -70,7 +68,7 @@ public sealed class ChangesViewModelTests : IDisposable
         _viewModel.Update(status, null);
 
         Assert.False(_viewModel.ShowEmptyRepository);
-        Assert.True(_viewModel.ShowList);
+        Assert.True(_viewModel.ShowContent);
         Assert.False(_viewModel.ShowEmptyChanges);
     }
 
@@ -153,13 +151,14 @@ public sealed class ChangesViewModelTests : IDisposable
         await _viewModel.StageCommand.Execute(change);
 
         await _gitService.Received(1).StageFileAsync("/repo", "file.txt", Arg.Any<CancellationToken>());
-        Assert.True(_stageCompleted);
+        Assert.True(_operationCompleted);
     }
 
     [Fact]
     public async Task UnstageCommand_CallsGitService()
     {
         _hasRepository.OnNext(true);
+        _operationCompleted = false;
 
         var status = new RepositoryStatus(
             "/repo",
@@ -173,7 +172,7 @@ public sealed class ChangesViewModelTests : IDisposable
         await _viewModel.UnstageCommand.Execute(change);
 
         await _gitService.Received(1).UnstageFileAsync("/repo", "file.txt", Arg.Any<CancellationToken>());
-        Assert.True(_unstageCompleted);
+        Assert.True(_operationCompleted);
     }
 
     [Fact]
@@ -184,7 +183,7 @@ public sealed class ChangesViewModelTests : IDisposable
         await _viewModel.StageCommand.Execute(null);
 
         await _gitService.DidNotReceive().StageFileAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
-        Assert.False(_stageCompleted);
+        Assert.False(_operationCompleted);
     }
 
     [Fact]

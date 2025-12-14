@@ -9,6 +9,7 @@ namespace Branchy.UI;
 public sealed class App : Avalonia.Application
 {
     private MainWindowViewModel? _mainViewModel;
+    private FileWatcherService? _fileWatcher;
 
     public override void Initialize()
     {
@@ -21,8 +22,9 @@ public sealed class App : Avalonia.Application
         {
             var gitService = new GitCliService();
             var dialogService = new DialogService();
+            _fileWatcher = new FileWatcherService();
 
-            _mainViewModel = new MainWindowViewModel(gitService, dialogService);
+            _mainViewModel = new MainWindowViewModel(gitService, dialogService, _fileWatcher);
 
             desktop.MainWindow = new MainWindow
             {
@@ -38,5 +40,6 @@ public sealed class App : Avalonia.Application
     private void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e)
     {
         _mainViewModel?.Dispose();
+        _fileWatcher?.Dispose();
     }
 }

@@ -7,14 +7,14 @@ using Xunit;
 
 namespace Branchy.Test;
 
-public sealed class CommitViewModelTests : IDisposable
+public sealed class CommitViewModelTest : IDisposable
 {
     private readonly IGitService _gitService;
     private readonly BehaviorSubject<bool> _hasRepository;
     private readonly CommitViewModel _viewModel;
-    private bool _commitCompleted;
+    private bool _operationCompleted;
 
-    public CommitViewModelTests()
+    public CommitViewModelTest()
     {
         _gitService = Substitute.For<IGitService>();
         _hasRepository = new BehaviorSubject<bool>(false);
@@ -23,7 +23,7 @@ public sealed class CommitViewModelTests : IDisposable
             _gitService,
             () => "/repo",
             _hasRepository,
-            () => { _commitCompleted = true; return Task.CompletedTask; }
+            () => { _operationCompleted = true; return Task.CompletedTask; }
         );
     }
 
@@ -91,7 +91,7 @@ public sealed class CommitViewModelTests : IDisposable
         await _viewModel.CommitCommand.Execute();
 
         await _gitService.Received(1).CommitAsync("/repo", "test message", Arg.Any<CancellationToken>());
-        Assert.True(_commitCompleted);
+        Assert.True(_operationCompleted);
     }
 
     [Fact]

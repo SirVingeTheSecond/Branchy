@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 using System.Threading;
@@ -11,8 +12,7 @@ public sealed class GitCliService : IGitService
 {
     public async Task<bool> IsRepositoryAsync(
         string path,
-        CancellationToken cancellationToken = default
-    )
+        CancellationToken cancellationToken = default)
     {
         var result = await RunGitAsync("rev-parse --is-inside-work-tree", path, cancellationToken);
         return result.ExitCode == 0 && result.StandardOutput.Trim() == "true";
@@ -20,113 +20,124 @@ public sealed class GitCliService : IGitService
 
     public async Task<RepositoryStatus> GetStatusAsync(
         string repositoryPath,
-        CancellationToken cancellationToken = default
-    )
+        CancellationToken cancellationToken = default)
+    {
+        var result = await RunGitAsync("status --porcelain=v2 -b", repositoryPath, cancellationToken);
+        ThrowIfFailed(result);
+        return GitStatusParser.Parse(repositoryPath, result.StandardOutput);
+    }
+
+    public async Task<IReadOnlyList<Branch>> GetBranchesAsync(
+        string repositoryPath,
+        CancellationToken cancellationToken = default)
     {
         var result = await RunGitAsync(
-            "status --porcelain=v2 -b",
+            "branch -a --format=%(refname:short)|%(HEAD)|%(refname:rstrip=-2)",
             repositoryPath,
-            cancellationToken
-        );
+            cancellationToken);
+        ThrowIfFailed(result);
+        return GitBranchParser.Parse(result.StandardOutput);
+    }
 
-        if (result.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                $"Git status failed with exit code {result.ExitCode}{Environment.NewLine}{result.StandardError}"
-            );
-        }
-
-        return GitStatusParser.Parse(repositoryPath, result.StandardOutput);
+    public async Task CheckoutAsync(
+        string repositoryPath,
+        string branchName,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await RunGitAsync($"checkout \"{branchName}\"", repositoryPath, cancellationToken);
+        ThrowIfFailed(result);
     }
 
     public async Task StageFileAsync(
         string repositoryPath,
         string relativePath,
-        CancellationToken cancellationToken = default
-    )
+        CancellationToken cancellationToken = default)
     {
-        var result = await RunGitAsync(
-            $"add \"{relativePath}\"",
-            repositoryPath,
-            cancellationToken
-        );
-
-        if (result.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                $"Git add failed with exit code {result.ExitCode}{Environment.NewLine}{result.StandardError}"
-            );
-        }
+        var result = await RunGitAsync($"add \"{relativePath}\"", repositoryPath, cancellationToken);
+        ThrowIfFailed(result);
     }
 
     public async Task UnstageFileAsync(
         string repositoryPath,
         string relativePath,
-        CancellationToken cancellationToken = default
-    )
+        CancellationToken cancellationToken = default)
     {
-        var result = await RunGitAsync(
-            $"restore --staged \"{relativePath}\"",
-            repositoryPath,
-            cancellationToken
-        );
-
-        if (result.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                $"Git restore staged failed with exit code {result.ExitCode}{Environment.NewLine}{result.StandardError}"
-            );
-        }
+        var result = await RunGitAsync($"restore --staged \"{relativePath}\"", repositoryPath, cancellationToken);
+        ThrowIfFailed(result);
     }
 
     public async Task CommitAsync(
         string repositoryPath,
         string message,
-        CancellationToken cancellationToken = default
-    )
+        CancellationToken cancellationToken = default)
     {
         var escapedMessage = message.Replace("\"", "\\\"");
-        var args = $"commit -m \"{escapedMessage}\"";
-
-        var result = await RunGitAsync(
-            args,
-            repositoryPath,
-            cancellationToken
-        );
-
-        if (result.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                $"Git commit failed with exit code {result.ExitCode}{Environment.NewLine}{result.StandardError}"
-            );
-        }
+        var result = await RunGitAsync($"commit -m \"{escapedMessage}\"", repositoryPath, cancellationToken);
+        ThrowIfFailed(result);
     }
 
     public async Task<string> GetDiffAsync(
         string repositoryPath,
         string relativePath,
         bool staged,
-        CancellationToken cancellationToken = default
-    )
+        CancellationToken cancellationToken = default)
     {
         var args = staged
             ? $"diff --cached -- \"{relativePath}\""
             : $"diff -- \"{relativePath}\"";
 
-        var result = await RunGitAsync(
-            args,
-            repositoryPath,
-            cancellationToken
-        );
+        var result = await RunGitAsync(args, repositoryPath, cancellationToken);
+        ThrowIfFailed(result);
+        return result.StandardOutput;
+    }
 
-        if (result.ExitCode != 0)
+    private static void ThrowIfFailed(GitResult result)
+    {
+        if (result.ExitCode == 0)
         {
-            throw new InvalidOperationException(
-                $"Git diff failed with exit code {result.ExitCode}{Environment.NewLine}{result.StandardError}"
-            );
+            return;
         }
 
-        return result.StandardOutput;
+        throw new InvalidOperationException(ExtractErrorMessage(result.StandardError));
+    }
+
+    private static string ExtractErrorMessage(string stderr)
+    {
+        var message = stderr.Trim();
+
+        if (string.IsNullOrEmpty(message))
+        {
+            return "An unknown error occurred.";
+        }
+
+        // Extract first line only
+        var newlineIndex = message.IndexOf('\n');
+        if (newlineIndex > 0)
+        {
+            message = message[..newlineIndex].Trim();
+        }
+
+        // Strip common prefixes
+        message = StripPrefix(message, "fatal:");
+        message = StripPrefix(message, "error:");
+
+        // Capitalize first letter
+        if (message.Length > 0 && char.IsLower(message[0]))
+        {
+            message = char.ToUpper(message[0]) + message[1..];
+        }
+
+        return message;
+    }
+
+    private static string StripPrefix(string message, string prefix)
+    {
+        if (message.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return message[prefix.Length..].TrimStart();
+        }
+
+        return message;
     }
 
     private sealed record GitResult(int ExitCode, string StandardOutput, string StandardError);
@@ -134,10 +145,8 @@ public sealed class GitCliService : IGitService
     private static async Task<GitResult> RunGitAsync(
         string arguments,
         string workingDirectory,
-        CancellationToken cancellationToken
-    )
+        CancellationToken cancellationToken)
     {
-        // This method ensures logic for process execution is just here so future changes to process behavior happen in one place
         var startInfo = new ProcessStartInfo
         {
             FileName = "git",
@@ -179,10 +188,6 @@ public sealed class GitCliService : IGitService
 
         await process.WaitForExitAsync(cancellationToken);
 
-        return new GitResult(
-            process.ExitCode,
-            output.ToString(),
-            error.ToString()
-        );
+        return new GitResult(process.ExitCode, output.ToString(), error.ToString());
     }
 }

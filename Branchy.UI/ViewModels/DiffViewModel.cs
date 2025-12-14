@@ -13,7 +13,8 @@ public sealed class DiffViewModel : ReactiveObject, IDisposable
     private readonly Action<Exception> _onError;
 
     private string _diffText = string.Empty;
-    private bool _hasSelection;
+    private bool _showContent;
+    private bool _showEmptySelection = true;
     private CancellationTokenSource? _loadCancellation;
 
     public DiffViewModel(
@@ -33,29 +34,35 @@ public sealed class DiffViewModel : ReactiveObject, IDisposable
         private set => this.RaiseAndSetIfChanged(ref _diffText, value);
     }
 
-    public bool ShowDiff => _hasSelection;
+    public bool ShowContent
+    {
+        get => _showContent;
+        private set => this.RaiseAndSetIfChanged(ref _showContent, value);
+    }
 
-    public bool ShowEmptyDiff => !_hasSelection;
+    public bool ShowEmptySelection
+    {
+        get => _showEmptySelection;
+        private set => this.RaiseAndSetIfChanged(ref _showEmptySelection, value);
+    }
 
     public void Dispose()
     {
-        _loadCancellation?.Cancel();
-        _loadCancellation?.Dispose();
+        CancelPendingLoad();
     }
 
     public void Load(FileChangeViewModel? change)
     {
-        _loadCancellation?.Cancel();
-        _loadCancellation?.Dispose();
+        CancelPendingLoad();
 
         if (change == null)
         {
-            SetSelectionState(false);
+            UpdateVisibilityState(false);
             DiffText = string.Empty;
             return;
         }
 
-        SetSelectionState(true);
+        UpdateVisibilityState(true);
 
         _loadCancellation = new CancellationTokenSource();
         _ = LoadAsync(change, _loadCancellation.Token);
@@ -63,21 +70,37 @@ public sealed class DiffViewModel : ReactiveObject, IDisposable
 
     public void Clear()
     {
-        _loadCancellation?.Cancel();
+        CancelPendingLoad();
         DiffText = string.Empty;
-        SetSelectionState(false);
+        UpdateVisibilityState(false);
     }
 
-    private void SetSelectionState(bool hasSelection)
+    private void CancelPendingLoad()
     {
-        if (_hasSelection == hasSelection)
+        var cts = _loadCancellation;
+        _loadCancellation = null;
+
+        if (cts == null)
         {
             return;
         }
 
-        _hasSelection = hasSelection;
-        this.RaisePropertyChanged(nameof(ShowDiff));
-        this.RaisePropertyChanged(nameof(ShowEmptyDiff));
+        try
+        {
+            cts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Already disposed
+        }
+
+        cts.Dispose();
+    }
+
+    private void UpdateVisibilityState(bool hasSelection)
+    {
+        ShowContent = hasSelection;
+        ShowEmptySelection = !hasSelection;
     }
 
     private async Task LoadAsync(FileChangeViewModel change, CancellationToken cancellationToken)
@@ -97,7 +120,7 @@ public sealed class DiffViewModel : ReactiveObject, IDisposable
                 cancellationToken
             );
 
-            if (!cancellationToken.IsCancellationRequested)
+            if (!IsCancelled(cancellationToken))
             {
                 DiffText = diff;
             }
@@ -106,13 +129,29 @@ public sealed class DiffViewModel : ReactiveObject, IDisposable
         {
             // Expected when user switches selection quickly
         }
+        catch (ObjectDisposedException)
+        {
+            // Expected when cancellation source was disposed
+        }
         catch (Exception ex)
         {
-            if (!cancellationToken.IsCancellationRequested)
+            if (!IsCancelled(cancellationToken))
             {
                 _onError(ex);
                 DiffText = string.Empty;
             }
+        }
+    }
+
+    private static bool IsCancelled(CancellationToken token)
+    {
+        try
+        {
+            return token.IsCancellationRequested;
+        }
+        catch (ObjectDisposedException)
+        {
+            return true;
         }
     }
 }

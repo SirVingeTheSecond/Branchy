@@ -4,6 +4,7 @@ using System.Collections.Specialized;
 using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Disposables.Fluent;
+using System.Reactive.Linq;
 using System.Threading.Tasks;
 using Branchy.UI.Models;
 using Branchy.UI.Services;
@@ -15,27 +16,26 @@ public sealed class ChangesViewModel : ReactiveObject, IDisposable
 {
     private readonly CompositeDisposable _disposables = new();
     private readonly Func<string> _getRepositoryPath;
-    private readonly Func<Task> _onStageCompleted;
-    private readonly Func<Task> _onUnstageCompleted;
+    private readonly Func<Task> _onOperationCompleted;
     private readonly IGitService _gitService;
 
     private FileChangeViewModel? _selectedChange;
     private bool _hasRepository;
+    private bool _showContent;
+    private bool _showEmptyRepository = true;
+    private bool _showEmptyChanges;
 
     public ChangesViewModel(
         IGitService gitService,
         Func<string> getRepositoryPath,
         Func<bool> getHasRepository,
         IObservable<bool> hasRepositoryChanged,
-        Func<Task> onStageCompleted,
-        Func<Task> onUnstageCompleted
+        Func<Task> onOperationCompleted
     )
     {
         _gitService = gitService;
         _getRepositoryPath = getRepositoryPath;
-        _onStageCompleted = onStageCompleted;
-        _onUnstageCompleted = onUnstageCompleted;
-
+        _onOperationCompleted = onOperationCompleted;
         _hasRepository = getHasRepository();
 
         hasRepositoryChanged
@@ -46,10 +46,17 @@ public sealed class ChangesViewModel : ReactiveObject, IDisposable
             })
             .DisposeWith(_disposables);
 
-        StageCommand = ReactiveCommand.CreateFromTask<FileChangeViewModel?>(StageAsync, hasRepositoryChanged);
-        UnstageCommand = ReactiveCommand.CreateFromTask<FileChangeViewModel?>(UnstageAsync, hasRepositoryChanged);
+        StageCommand = ReactiveCommand.CreateFromTask<FileChangeViewModel?>(
+            StageAsync,
+            hasRepositoryChanged
+        );
 
-        Changes.CollectionChanged += OnChangesCollectionChanged;
+        UnstageCommand = ReactiveCommand.CreateFromTask<FileChangeViewModel?>(
+            UnstageAsync,
+            hasRepositoryChanged
+        );
+
+        Changes.CollectionChanged += OnCollectionChanged;
     }
 
     public ObservableCollection<FileChangeViewModel> Changes { get; } = new();
@@ -66,11 +73,23 @@ public sealed class ChangesViewModel : ReactiveObject, IDisposable
 
     public bool HasSelection => SelectedChange != null;
 
-    public bool ShowList { get; private set; }
+    public bool ShowContent
+    {
+        get => _showContent;
+        private set => this.RaiseAndSetIfChanged(ref _showContent, value);
+    }
 
-    public bool ShowEmptyRepository { get; private set; } = true;
+    public bool ShowEmptyRepository
+    {
+        get => _showEmptyRepository;
+        private set => this.RaiseAndSetIfChanged(ref _showEmptyRepository, value);
+    }
 
-    public bool ShowEmptyChanges { get; private set; }
+    public bool ShowEmptyChanges
+    {
+        get => _showEmptyChanges;
+        private set => this.RaiseAndSetIfChanged(ref _showEmptyChanges, value);
+    }
 
     public ReactiveCommand<FileChangeViewModel?, Unit> StageCommand { get; }
 
@@ -78,7 +97,7 @@ public sealed class ChangesViewModel : ReactiveObject, IDisposable
 
     public void Dispose()
     {
-        Changes.CollectionChanged -= OnChangesCollectionChanged;
+        Changes.CollectionChanged -= OnCollectionChanged;
         StageCommand.Dispose();
         UnstageCommand.Dispose();
         _disposables.Dispose();
@@ -89,14 +108,15 @@ public sealed class ChangesViewModel : ReactiveObject, IDisposable
         var selectionPath = preserveSelectionPath ?? SelectedChange?.Path;
 
         Changes.Clear();
+
         foreach (var change in status.Changes)
         {
             Changes.Add(new FileChangeViewModel(change));
         }
 
-        SelectedChange = selectionPath == null
-            ? null
-            : FindChangeByPath(selectionPath);
+        SelectedChange = selectionPath != null
+            ? FindChangeByPath(selectionPath)
+            : null;
     }
 
     public void ClearSelection()
@@ -113,30 +133,20 @@ public sealed class ChangesViewModel : ReactiveObject, IDisposable
                 return change;
             }
         }
+
         return null;
     }
 
-    private void OnChangesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         UpdateVisibilityState();
     }
 
     private void UpdateVisibilityState()
     {
-        var previousShowList = ShowList;
-        var previousShowEmptyRepository = ShowEmptyRepository;
-        var previousShowEmptyChanges = ShowEmptyChanges;
-
-        ShowList = _hasRepository && Changes.Count > 0;
+        ShowContent = _hasRepository && Changes.Count > 0;
         ShowEmptyRepository = !_hasRepository;
         ShowEmptyChanges = _hasRepository && Changes.Count == 0;
-
-        if (previousShowList != ShowList)
-            this.RaisePropertyChanged(nameof(ShowList));
-        if (previousShowEmptyRepository != ShowEmptyRepository)
-            this.RaisePropertyChanged(nameof(ShowEmptyRepository));
-        if (previousShowEmptyChanges != ShowEmptyChanges)
-            this.RaisePropertyChanged(nameof(ShowEmptyChanges));
     }
 
     private async Task StageAsync(FileChangeViewModel? change)
@@ -153,7 +163,7 @@ public sealed class ChangesViewModel : ReactiveObject, IDisposable
         }
 
         await _gitService.StageFileAsync(repoPath, change.Path);
-        await _onStageCompleted();
+        await _onOperationCompleted();
     }
 
     private async Task UnstageAsync(FileChangeViewModel? change)
@@ -170,6 +180,6 @@ public sealed class ChangesViewModel : ReactiveObject, IDisposable
         }
 
         await _gitService.UnstageFileAsync(repoPath, change.Path);
-        await _onUnstageCompleted();
+        await _onOperationCompleted();
     }
 }

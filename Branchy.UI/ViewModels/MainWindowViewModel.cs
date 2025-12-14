@@ -4,6 +4,7 @@ using System.Reactive.Disposables;
 using System.Reactive.Disposables.Fluent;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
+using System.Threading;
 using System.Threading.Tasks;
 using Branchy.UI.Models;
 using Branchy.UI.Services;
@@ -13,24 +14,32 @@ namespace Branchy.UI.ViewModels;
 
 public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 {
+    private const int ErrorDisplayMs = 3000;
+    private const int ProgressUpdateMs = 100;
+
     private readonly IGitService _gitService;
     private readonly IDialogService _dialogService;
+    private readonly IFileWatcherService _fileWatcher;
     private readonly CompositeDisposable _disposables = new();
     private readonly BehaviorSubject<bool> _hasRepositorySubject = new(false);
 
     private string _repositoryPath = string.Empty;
     private string _branchDisplay = string.Empty;
     private string? _errorMessage;
+    private double _errorDismissProgress = 100;
+    private CancellationTokenSource? _errorDismissCts;
 
     private readonly ObservableAsPropertyHelper<bool> _isBusy;
 
     public MainWindowViewModel(
         IGitService gitService,
-        IDialogService dialogService
+        IDialogService dialogService,
+        IFileWatcherService fileWatcher
     )
     {
         _gitService = gitService;
         _dialogService = dialogService;
+        _fileWatcher = fileWatcher;
 
         var hasRepositoryObservable = _hasRepositorySubject.AsObservable();
 
@@ -39,14 +48,13 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
             () => RepositoryPath,
             () => HasRepository,
             hasRepositoryObservable,
-            () => ReloadAfterStageAsync(),
-            () => ReloadAfterUnstageAsync()
+            () => ReloadAfterOperationAsync()
         );
 
         Diff = new DiffViewModel(
             gitService,
             () => RepositoryPath,
-            ex => ErrorMessage = FormatErrorMessage(ex)
+            ex => ShowError(ex)
         );
 
         Commit = new CommitViewModel(
@@ -54,6 +62,14 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
             () => RepositoryPath,
             hasRepositoryObservable,
             () => ReloadAfterCommitAsync()
+        );
+
+        Branches = new BranchesViewModel(
+            gitService,
+            () => RepositoryPath,
+            () => HasRepository,
+            hasRepositoryObservable,
+            () => ReloadAfterCheckoutAsync()
         );
 
         BrowseRepositoryCommand = ReactiveCommand.CreateFromTask(BrowseRepositoryAsync);
@@ -69,7 +85,9 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
                 Commit.CommitCommand.IsExecuting,
                 Changes.StageCommand.IsExecuting,
                 Changes.UnstageCommand.IsExecuting,
-                (browse, reload, commit, stage, unstage) => browse || reload || commit || stage || unstage)
+                Branches.CheckoutCommand.IsExecuting,
+                (browse, reload, commit, stage, unstage, checkout) => 
+                    browse || reload || commit || stage || unstage || checkout)
             .ToProperty(this, x => x.IsBusy)
             .DisposeWith(_disposables);
 
@@ -78,13 +96,20 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
                 ReloadStatusCommand.ThrownExceptions,
                 Commit.CommitCommand.ThrownExceptions,
                 Changes.StageCommand.ThrownExceptions,
-                Changes.UnstageCommand.ThrownExceptions)
-            .Subscribe(ex => ErrorMessage = FormatErrorMessage(ex))
+                Changes.UnstageCommand.ThrownExceptions,
+                Branches.CheckoutCommand.ThrownExceptions)
+            .Subscribe(async ex =>
+            {
+                ShowError(ex);
+                await ReloadStatusAsync(null, false);
+            })
             .DisposeWith(_disposables);
 
         Changes.WhenAnyValue(x => x.SelectedChange)
             .Subscribe(change => Diff.Load(change))
             .DisposeWith(_disposables);
+
+        _fileWatcher.Changed += OnFileSystemChanged;
     }
 
     public string RepositoryPath
@@ -96,6 +121,15 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
             var hasRepo = !string.IsNullOrWhiteSpace(value);
             _hasRepositorySubject.OnNext(hasRepo);
             this.RaisePropertyChanged(nameof(HasRepository));
+
+            if (hasRepo)
+            {
+                _fileWatcher.Watch(value);
+            }
+            else
+            {
+                _fileWatcher.Stop();
+            }
         }
     }
 
@@ -110,10 +144,25 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
         {
             this.RaiseAndSetIfChanged(ref _errorMessage, value);
             this.RaisePropertyChanged(nameof(HasError));
+
+            if (value != null)
+            {
+                ScheduleErrorDismiss();
+            }
+            else
+            {
+                CancelErrorDismiss();
+            }
         }
     }
 
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
+
+    public double ErrorDismissProgress
+    {
+        get => _errorDismissProgress;
+        private set => this.RaiseAndSetIfChanged(ref _errorDismissProgress, value);
+    }
 
     public string BranchDisplay
     {
@@ -122,24 +171,38 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
     }
 
     public ChangesViewModel Changes { get; }
-
+    public BranchesViewModel Branches { get; }
     public DiffViewModel Diff { get; }
-
     public CommitViewModel Commit { get; }
 
     public ReactiveCommand<Unit, Unit> BrowseRepositoryCommand { get; }
-
     public ReactiveCommand<Unit, Unit> ReloadStatusCommand { get; }
-
     public ReactiveCommand<Unit, string?> DismissErrorCommand { get; }
 
     public void Dispose()
     {
+        CancelErrorDismiss();
+        _fileWatcher.Changed -= OnFileSystemChanged;
+        _fileWatcher.Stop();
         Changes.Dispose();
+        Branches.Dispose();
         Diff.Dispose();
         Commit.Dispose();
         _hasRepositorySubject.Dispose();
         _disposables.Dispose();
+    }
+
+    private void OnFileSystemChanged()
+    {
+        if (!HasRepository || IsBusy)
+        {
+            return;
+        }
+
+        Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
+        {
+            await ReloadStatusAsync(Changes.SelectedChange?.Path, false);
+        });
     }
 
     private async Task BrowseRepositoryAsync()
@@ -169,25 +232,28 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
             return;
         }
 
-        var status = await _gitService.GetStatusAsync(RepositoryPath);
-
-        BranchDisplay = FormatBranchDisplay(status.Branch);
-        Changes.Update(status, preservedSelectionPath);
-        Diff.Clear();
-
-        if (resetCommitMessage)
+        try
         {
-            Commit.Clear();
+            var status = await _gitService.GetStatusAsync(RepositoryPath);
+            var branches = await _gitService.GetBranchesAsync(RepositoryPath);
+
+            BranchDisplay = FormatBranchDisplay(status.Branch);
+            Changes.Update(status, preservedSelectionPath);
+            Branches.Update(branches);
+            Diff.Clear();
+
+            if (resetCommitMessage)
+            {
+                Commit.Clear();
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex);
         }
     }
 
-    private Task ReloadAfterStageAsync()
-    {
-        var selectedPath = Changes.SelectedChange?.Path;
-        return ReloadStatusAsync(selectedPath, false);
-    }
-
-    private Task ReloadAfterUnstageAsync()
+    private Task ReloadAfterOperationAsync()
     {
         var selectedPath = Changes.SelectedChange?.Path;
         return ReloadStatusAsync(selectedPath, false);
@@ -198,18 +264,76 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
         return ReloadStatusAsync(null, true);
     }
 
+    private Task ReloadAfterCheckoutAsync()
+    {
+        return ReloadStatusAsync(null, true);
+    }
+
+    private void ShowError(Exception ex)
+    {
+        var message = FormatErrorMessage(ex);
+        if (message != null)
+        {
+            ErrorMessage = message;
+        }
+    }
+
     private static string FormatBranchDisplay(BranchStatus branch)
     {
-        // Use icons here
         return $"{branch.Name} ↑{branch.AheadBy} ↓{branch.BehindBy}";
     }
 
-    private static string FormatErrorMessage(Exception ex)
+    private static string? FormatErrorMessage(Exception ex)
     {
-        return ex switch
+        // Internal errors - suppress silently
+        if (ex is OperationCanceledException or ObjectDisposedException)
         {
-            InvalidOperationException ioe when ioe.Message.Contains("Git") => ioe.Message,
-            _ => $"An error occurred: {ex.Message}"
-        };
+            return null;
+        }
+
+        // Service layer already provides user-friendly messages
+        if (ex is InvalidOperationException)
+        {
+            return ex.Message;
+        }
+
+        return $"An unexpected error occurred: {ex.Message}";
+    }
+
+    private async void ScheduleErrorDismiss()
+    {
+        CancelErrorDismiss();
+        ErrorDismissProgress = 100;
+
+        _errorDismissCts = new CancellationTokenSource();
+        var token = _errorDismissCts.Token;
+        var steps = ErrorDisplayMs / ProgressUpdateMs;
+        var decrementPerStep = 100.0 / steps;
+
+        try
+        {
+            for (var i = 0; i < steps && !token.IsCancellationRequested; i++)
+            {
+                await Task.Delay(ProgressUpdateMs, token);
+                ErrorDismissProgress -= decrementPerStep;
+            }
+
+            if (!token.IsCancellationRequested)
+            {
+                ErrorMessage = null;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when dismissed manually or new error shown
+        }
+    }
+
+    private void CancelErrorDismiss()
+    {
+        _errorDismissCts?.Cancel();
+        _errorDismissCts?.Dispose();
+        _errorDismissCts = null;
+        ErrorDismissProgress = 100;
     }
 }
