@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Branchy.Application", "Bran
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Branchy.Infrastructure.GitCli", "Branchy.Infrastructure.GitCli\Branchy.Infrastructure.GitCli.csproj", "{497CDB45-9C47-48FB-9BC3-235EF7A3824A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Branchy.Test", "Branchy.Test\Branchy.Test.csproj", "{10451D5F-BBF6-4551-9FAA-D6EAAC6C1F51}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{497CDB45-9C47-48FB-9BC3-235EF7A3824A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{497CDB45-9C47-48FB-9BC3-235EF7A3824A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{497CDB45-9C47-48FB-9BC3-235EF7A3824A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{10451D5F-BBF6-4551-9FAA-D6EAAC6C1F51}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{10451D5F-BBF6-4551-9FAA-D6EAAC6C1F51}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{10451D5F-BBF6-4551-9FAA-D6EAAC6C1F51}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{10451D5F-BBF6-4551-9FAA-D6EAAC6C1F51}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

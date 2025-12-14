@@ -8,16 +8,29 @@ public static class GitStatusParser
     {
         var lines = statusOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries);
 
-        BranchStatus? branch = null;
+        string? branchName = null;
+        int aheadBy = 0;
+        int behindBy = 0;
         var changes = new List<FileChange>();
 
         foreach (var rawLine in lines)
         {
             var line = rawLine.TrimEnd('\r');
 
+            if (line.StartsWith("# branch.head ", StringComparison.Ordinal))
+            {
+                branchName = line.Substring("# branch.head ".Length).Trim();
+                continue;
+            }
+
+            if (line.StartsWith("# branch.ab ", StringComparison.Ordinal))
+            {
+                ParseAheadBehind(line, out aheadBy, out behindBy);
+                continue;
+            }
+
             if (line.StartsWith("#", StringComparison.Ordinal))
             {
-                branch ??= ParseBranchLine(line);
                 continue;
             }
 
@@ -30,7 +43,7 @@ public static class GitStatusParser
             }
         }
 
-        branch ??= new BranchStatus("HEAD", 0, 0);
+        var branch = new BranchStatus(branchName ?? "HEAD", aheadBy, behindBy);
 
         return new RepositoryStatus(
             repositoryPath,
@@ -39,41 +52,25 @@ public static class GitStatusParser
         );
     }
 
-    private static BranchStatus ParseBranchLine(string line)
+    private static void ParseAheadBehind(string line, out int ahead, out int behind)
     {
-        const string headPrefix = "# branch.head ";
-        const string abPrefix = "# branch.ab ";
+        ahead = 0;
+        behind = 0;
 
-        if (line.StartsWith(headPrefix, StringComparison.Ordinal))
+        var content = line.Substring("# branch.ab ".Length).Trim();
+        var parts = content.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var part in parts)
         {
-            var name = line.Substring(headPrefix.Length).Trim();
-            return new BranchStatus(name, 0, 0);
-        }
-
-        if (line.StartsWith(abPrefix, StringComparison.Ordinal))
-        {
-            var content = line.Substring(abPrefix.Length).Trim();
-            var parts = content.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-
-            var ahead = 0;
-            var behind = 0;
-
-            foreach (var part in parts)
+            if (part.StartsWith("+", StringComparison.Ordinal))
             {
-                if (part.StartsWith("+", StringComparison.Ordinal))
-                {
-                    int.TryParse(part.AsSpan(1), out ahead);
-                }
-                else if (part.StartsWith("-", StringComparison.Ordinal))
-                {
-                    int.TryParse(part.AsSpan(1), out behind);
-                }
+                int.TryParse(part.AsSpan(1), out ahead);
             }
-
-            return new BranchStatus("HEAD", ahead, behind);
+            else if (part.StartsWith("-", StringComparison.Ordinal))
+            {
+                int.TryParse(part.AsSpan(1), out behind);
+            }
         }
-
-        return new BranchStatus("HEAD", 0, 0);
     }
 
     private static FileChange ParseChangeLine(string line)
