@@ -5,9 +5,7 @@ using System.Reactive.Disposables.Fluent;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Threading.Tasks;
-using Branchy.Application.Git;
-using Branchy.Application.Repositories;
-using Branchy.Domain.Models;
+using Branchy.UI.Models;
 using Branchy.UI.Services;
 using ReactiveUI;
 
@@ -15,7 +13,6 @@ namespace Branchy.UI.ViewModels;
 
 public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 {
-    private readonly GetRepositoryStatusUseCase _getStatusUseCase;
     private readonly IGitService _gitService;
     private readonly IDialogService _dialogService;
     private readonly CompositeDisposable _disposables = new();
@@ -28,12 +25,10 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
     private readonly ObservableAsPropertyHelper<bool> _isBusy;
 
     public MainWindowViewModel(
-        GetRepositoryStatusUseCase getStatusUseCase,
         IGitService gitService,
         IDialogService dialogService
     )
     {
-        _getStatusUseCase = getStatusUseCase;
         _gitService = gitService;
         _dialogService = dialogService;
 
@@ -174,7 +169,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
             return;
         }
 
-        var status = await _getStatusUseCase.ExecuteAsync(RepositoryPath);
+        var status = await _gitService.GetStatusAsync(RepositoryPath);
 
         BranchDisplay = FormatBranchDisplay(status.Branch);
         Changes.Update(status, preservedSelectionPath);
@@ -205,6 +200,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 
     private static string FormatBranchDisplay(BranchStatus branch)
     {
+        // Use icons here
         return $"{branch.Name} ↑{branch.AheadBy} ↓{branch.BehindBy}";
     }
 

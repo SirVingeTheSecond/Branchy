@@ -5,8 +5,8 @@ using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Disposables.Fluent;
 using System.Threading.Tasks;
-using Branchy.Application.Git;
-using Branchy.Domain.Models;
+using Branchy.UI.Models;
+using Branchy.UI.Services;
 using ReactiveUI;
 
 namespace Branchy.UI.ViewModels;

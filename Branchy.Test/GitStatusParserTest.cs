@@ -1,5 +1,5 @@
-﻿using Branchy.Domain.Models;
-using Branchy.Infrastructure.GitCli;
+﻿using Branchy.UI.Models;
+using Branchy.UI.Services;
 using Xunit;
 
 namespace Branchy.Test;

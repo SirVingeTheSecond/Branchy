@@ -1,7 +1,5 @@
 ﻿using System.Reactive.Linq;
-using Branchy.Application.Git;
-using Branchy.Application.Repositories;
-using Branchy.Domain.Models;
+using Branchy.UI.Models;
 using Branchy.UI.Services;
 using Branchy.UI.ViewModels;
 using NSubstitute;
@@ -13,16 +11,14 @@ public sealed class MainWindowViewModelTests : IDisposable
 {
     private readonly IGitService _gitService;
     private readonly IDialogService _dialogService;
-    private readonly GetRepositoryStatusUseCase _getStatusUseCase;
     private readonly MainWindowViewModel _viewModel;
 
     public MainWindowViewModelTests()
     {
         _gitService = Substitute.For<IGitService>();
         _dialogService = Substitute.For<IDialogService>();
-        _getStatusUseCase = new GetRepositoryStatusUseCase(_gitService);
 
-        _viewModel = new MainWindowViewModel(_getStatusUseCase, _gitService, _dialogService);
+        _viewModel = new MainWindowViewModel(_gitService, _dialogService);
     }
 
     public void Dispose()

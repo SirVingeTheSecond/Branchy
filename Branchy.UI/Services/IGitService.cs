@@ -1,6 +1,10 @@
-﻿using Branchy.Domain.Models;
+﻿
 
-namespace Branchy.Application.Git;
+using System.Threading;
+using System.Threading.Tasks;
+using Branchy.UI.Models;
+
+namespace Branchy.UI.Services;
 
 public interface IGitService
 {

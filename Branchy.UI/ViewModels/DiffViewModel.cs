@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Branchy.Application.Git;
+using Branchy.UI.Services;
 using ReactiveUI;
 
 namespace Branchy.UI.ViewModels;

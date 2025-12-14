@@ -2,7 +2,7 @@
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
-using Branchy.Application.Git;
+using Branchy.UI.Services;
 using ReactiveUI;
 
 namespace Branchy.UI.ViewModels;

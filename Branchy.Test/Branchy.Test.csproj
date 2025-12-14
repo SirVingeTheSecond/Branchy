@@ -15,8 +15,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Branchy.Application\Branchy.Application.csproj" />
-    <ProjectReference Include="..\Branchy.Domain\Branchy.Domain.csproj" />
     <ProjectReference Include="..\Branchy.UI\Branchy.UI.csproj" />
   </ItemGroup>
 

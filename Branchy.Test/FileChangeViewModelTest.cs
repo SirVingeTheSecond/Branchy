@@ -1,4 +1,4 @@
-﻿using Branchy.Domain.Models;
+﻿using Branchy.UI.Models;
 using Branchy.UI.ViewModels;
 using Xunit;
 

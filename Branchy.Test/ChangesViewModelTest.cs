@@ -1,7 +1,7 @@
 ﻿using System.Reactive.Linq;
 using System.Reactive.Subjects;
-using Branchy.Application.Git;
-using Branchy.Domain.Models;
+using Branchy.UI.Models;
+using Branchy.UI.Services;
 using Branchy.UI.ViewModels;
 using NSubstitute;
 using Xunit;

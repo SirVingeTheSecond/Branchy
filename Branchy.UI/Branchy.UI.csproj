@@ -23,10 +23,4 @@
         </PackageReference>
         <PackageReference Include="ReactiveUI.Avalonia" Version="11.3.8"/>
     </ItemGroup>
-
-    <ItemGroup>
-      <ProjectReference Include="..\Branchy.Application\Branchy.Application.csproj" />
-      <ProjectReference Include="..\Branchy.Domain\Branchy.Domain.csproj" />
-      <ProjectReference Include="..\Branchy.Infrastructure.GitCli\Branchy.Infrastructure.GitCli.csproj" />
-    </ItemGroup>
 </Project>

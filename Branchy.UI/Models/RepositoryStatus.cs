@@ -1,4 +1,6 @@
-﻿namespace Branchy.Domain.Models;
+﻿using System.Collections.Generic;
+
+namespace Branchy.UI.Models;
 
 public enum FileChangeKind
 {

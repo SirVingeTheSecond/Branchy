@@ -1,9 +1,11 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.Text;
-using Branchy.Application.Git;
-using Branchy.Domain.Models;
+using System.Threading;
+using System.Threading.Tasks;
+using Branchy.UI.Models;
 
-namespace Branchy.Infrastructure.GitCli;
+namespace Branchy.UI.Services;
 
 public sealed class GitCliService : IGitService
 {
@@ -147,6 +149,9 @@ public sealed class GitCliService : IGitService
             CreateNoWindow = true
         };
 
+        // ToDo:
+        // Initialize object properties inside the 'using' statement to ensure that the object is disposed
+        // if an exception is thrown during initialization
         using var process = new Process { StartInfo = startInfo };
 
         var output = new StringBuilder();

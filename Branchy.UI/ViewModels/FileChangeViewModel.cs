@@ -1,4 +1,4 @@
-﻿using Branchy.Domain.Models;
+﻿using Branchy.UI.Models;
 using ReactiveUI;
 
 namespace Branchy.UI.ViewModels;

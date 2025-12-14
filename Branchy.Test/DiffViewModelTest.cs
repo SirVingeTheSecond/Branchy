@@ -1,5 +1,5 @@
-﻿using Branchy.Application.Git;
-using Branchy.Domain.Models;
+﻿using Branchy.UI.Models;
+using Branchy.UI.Services;
 using Branchy.UI.ViewModels;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;

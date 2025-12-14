@@ -1,8 +1,5 @@
-using System;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using Branchy.Application.Repositories;
-using Branchy.Infrastructure.GitCli;
 using Branchy.UI.Services;
 using Branchy.UI.ViewModels;
 using Branchy.UI.Views;
@@ -24,9 +21,8 @@ public sealed class App : Avalonia.Application
         {
             var gitService = new GitCliService();
             var dialogService = new DialogService();
-            var getStatusUseCase = new GetRepositoryStatusUseCase(gitService);
 
-            _mainViewModel = new MainWindowViewModel(getStatusUseCase, gitService, dialogService);
+            _mainViewModel = new MainWindowViewModel(gitService, dialogService);
 
             desktop.MainWindow = new MainWindow
             {

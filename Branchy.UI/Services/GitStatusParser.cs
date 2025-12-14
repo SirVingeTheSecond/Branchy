@@ -1,6 +1,8 @@
-﻿using Branchy.Domain.Models;
+﻿using System;
+using System.Collections.Generic;
+using Branchy.UI.Models;
 
-namespace Branchy.Infrastructure.GitCli;
+namespace Branchy.UI.Services;
 
 public static class GitStatusParser
 {
